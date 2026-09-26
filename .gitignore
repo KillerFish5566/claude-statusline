@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.worktrees/
+
+# secrets and local-only files (none are expected in this repo)
+.env
+.env.*
+secrets.*
+credentials.*
+*.local.*
+
+# editor settings
+.vscode/
+.idea/
+*.swp
