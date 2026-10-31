@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Plan names follow Anthropic's 2026-10-30 rename: Max 5x shows as **Max**, Max 20x as **Ultra**. Reads `planDisplayName` from `.claude.json` when Claude Code provides it.
-- `--mascot`: Clawd, 3 rows tall, at the right end of the status line (off by default).
+- `--mascot`: Clawd, 3 rows tall, at the right end of the status line (off by default). Its face follows the session data: tense (5-hour or 7-day usage at 80 %+), sweating (context at 80 %+), proud (300+ changed lines or $20+ session cost), normal otherwise.
 
 ## 0.1.0 — 2026-09-26
 

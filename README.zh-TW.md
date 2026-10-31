@@ -50,7 +50,7 @@ Opus 5.5 · high · Max │ my-project (main*) │ 記憶 ▰▰▰▱▱▱▱�
 - Windows 路徑請用正斜線 `/`。
 - 如果打 `python` 會跳出 Microsoft Store，就改填 `python.exe` 的完整路徑。
 - `refreshInterval` 讓 Claude 在背景等 Codex 時，畫面也會繼續更新。
-- 想在狀態列右邊放 Claude Code 啟動畫面那隻像素小怪（Clawd，3 行高），在指令最後加 `--mascot`。只有兩行字時會多出第三行；終端機寬度不到 64 字元時自動不畫。
+- 想在狀態列右邊放 Claude Code 啟動畫面那隻像素小怪（Clawd，3 行高），在指令最後加 `--mascot`。只有兩行字時會多出第三行；終端機寬度不到 64 字元時自動不畫。表情跟著狀態換：5 小時或 7 天用量到 80% 會緊張、對話空間用到 80% 會冒汗、改動 300 行或花費到 20 美元會得意，其他時候（或資料還沒來）是一般表情；只在 Claude Code 重畫狀態列時換，不會自己動。
 
 其他選項（`--no-codex`、`--mascot`、`CLAUDE_CONFIG_DIR`、`CODEX_HOME`）與隱私說明，見[英文版](README.md)。
 

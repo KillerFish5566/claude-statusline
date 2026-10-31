@@ -83,11 +83,28 @@ USAGE_CACHE_AGE_SHOW_S = 10 * 60   # show "(3h ago)" once the cache is older tha
 # start-up screen (same glyphs and colour as Claude Code 2.1.316 draws),
 # 3 rows tall at the right end of the status line.
 C_CLAWD = rgb(215, 119, 87)
-MASCOT = (" ▐▛███▛█", "▝▜██████▀", " ▝▝   ▝▝")
-MASCOT_W = 9           # columns taken by the widest row
+MASCOT = (" ▐▛███▛█ ", "▝▜██████▀", " ▝▝   ▝▝")   # the "normal" face
+MASCOT_W = 9           # columns taken by every row (all faces are this wide)
 MASCOT_GAP = 2         # minimum space between the text and the mascot
 MASCOT_MIN_COLS = 60   # narrower than this: no mascot, the text needs the room
 NBSP = " "        # Claude Code collapses runs of normal spaces
+
+# Clawd's face follows the session data Claude Code pipes in (no timer
+# animation: it only changes when Claude Code re-runs the script). Each face
+# swaps the two eye glyphs on the top row and adds one mark after the head.
+C_ALERT = rgb(235, 90, 90)
+C_SWEAT = rgb(110, 170, 255)
+C_SPARK = rgb(240, 200, 80)
+MASCOT_FACES = {       # name: (left eye, right eye, mark, mark colour)
+    "normal": ("▛", "▛", " ", ""),
+    "tense": ("▛", "▜", "!", C_ALERT),     # 5-hour or 7-day usage is high
+    "sweat": ("▜", "▛", "▖", C_SWEAT),     # context window is nearly full
+    "proud": ("▀", "▀", "▝", C_SPARK),     # lots of lines changed or spent
+}
+MOOD_LIMIT_PCT = 80      # 5-hour or 7-day usage at or above this -> tense
+MOOD_CONTEXT_PCT = 80    # context window use at or above this -> sweat
+MOOD_PROUD_LINES = 300   # lines added + removed at or above this -> proud
+MOOD_PROUD_COST = 20.0   # session cost (USD, list price) at or above this -> proud
 
 
 # ── Helpers ─────────────────────────────────────────────
@@ -422,19 +439,57 @@ def codex_line(r, now):
 
 
 # ── Main ────────────────────────────────────────────────
-def add_mascot(lines, cols):
+def _num(v):
+    if isinstance(v, bool):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def mascot_mood(data):
+    """Pick Clawd's face from stdin data. Any field may be missing -> normal."""
+    for key in ("five_hour", "seven_day"):
+        p = _num(get(data, "rate_limits", key, "used_percentage"))
+        if p is not None and p >= MOOD_LIMIT_PCT:
+            return "tense"
+    p = _num(get(data, "context_window", "used_percentage"))
+    if p is not None and p >= MOOD_CONTEXT_PCT:
+        return "sweat"
+    changed = sum(_num(get(data, "cost", k)) or 0
+                  for k in ("total_lines_added", "total_lines_removed"))
+    cost = _num(get(data, "cost", "total_cost_usd"))
+    if changed >= MOOD_PROUD_LINES or (cost is not None and cost >= MOOD_PROUD_COST):
+        return "proud"
+    return "normal"
+
+
+def mascot_rows(mood="normal"):
+    """The mascot's rows as (art, mark, mark colour); every row is MASCOT_W wide."""
+    left, right, mark, color = MASCOT_FACES.get(mood, MASCOT_FACES["normal"])
+    return [(f" ▐{left}███{right}█", mark, color), (MASCOT[1], "", ""), (MASCOT[2], "", "")]
+
+
+def add_mascot(lines, cols, mood="normal"):
     """Put the 3-row mascot at the right end of the first three rows.
 
     Pads with NBSP because Claude Code collapses runs of normal spaces.
     Returns the lines unchanged if any of the first three rows is too wide.
     """
     start = cols - MASCOT_W
-    rows = list(lines) + [""] * max(0, len(MASCOT) - len(lines))
-    if any(width(rows[i]) + MASCOT_GAP > start for i in range(len(MASCOT))):
+    art_rows = mascot_rows(mood)
+    rows = list(lines) + [""] * max(0, len(art_rows) - len(lines))
+    if any(width(rows[i]) + MASCOT_GAP > start for i in range(len(art_rows))):
         return list(lines)
-    for i, art in enumerate(MASCOT):
+    for i, (art, mark, color) in enumerate(art_rows):
         pad = NBSP * (start - width(rows[i]))
-        rows[i] = f"{rows[i]}{RESET}{pad}{C_CLAWD}{art.replace(' ', NBSP)}{RESET}"
+        body = f"{C_CLAWD}{art.replace(' ', NBSP)}{RESET}"
+        if mark.strip():
+            body += f"{color}{mark}{RESET}"
+        elif mark:
+            body += NBSP * len(mark)
+        rows[i] = f"{rows[i]}{RESET}{pad}{body}"
     return rows
 
 
@@ -467,7 +522,7 @@ def render(data, cols, now, codex=True, mascot=False):
             pass
     lines = [ln for ln in lines if ln]
     if mascot:
-        lines = add_mascot(lines, full_cols)
+        lines = add_mascot(lines, full_cols, mascot_mood(data))
     return "\n".join(lines)
 
 
@@ -477,7 +532,8 @@ def main(argv=None):
     ap.add_argument("--lang", choices=sorted(STRINGS), default="en")
     ap.add_argument("--no-codex", action="store_true", help="hide Codex rows")
     ap.add_argument("--mascot", action="store_true",
-                    help="draw Clawd (3 rows tall) at the right end")
+                    help="draw Clawd (3 rows tall) at the right end; "
+                         "its face follows usage and context")
     args = ap.parse_args(argv)
     T = STRINGS[args.lang]
     try:

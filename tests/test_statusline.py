@@ -39,6 +39,8 @@ SAMPLE = {
              "total_lines_added": 120, "total_lines_removed": 30},
 }
 
+CALM = dict(SAMPLE, rate_limits={"five_hour": {"used_percentage": 23}})
+
 
 def claude_cfg(fetched_ago=3 * 3600, resets_in=2 * 86400, account="acct-1", cache_account="acct-1"):
     return {
@@ -177,21 +179,97 @@ class Mascot(Env):
         self.assertNotIn("▛", out)
         self.assertNotIn(sl.NBSP, out)
 
+    def art(self, mood):
+        return [(a + m).replace(" ", sl.NBSP) for a, m, _ in sl.mascot_rows(mood)]
+
     def test_three_rows_right_aligned(self):
-        rows = self.rows(120)
-        self.assertEqual(len(rows), 3)
-        start = 120 - sl.MASCOT_W
-        for row, art in zip(rows, sl.MASCOT):
-            art = art.replace(" ", sl.NBSP)
-            self.assertTrue(row.endswith(art), row)
-            self.assertEqual(sl.width(row) - sl.width(art), start, row)
-            self.assertNotIn("  ", row)   # Claude Code collapses plain spaces
+        for data in (SAMPLE, CALM):
+            rows = self.rows(120, data=data)
+            self.assertEqual(len(rows), 3)
+            start = 120 - sl.MASCOT_W
+            for row, art in zip(rows, self.art(sl.mascot_mood(data))):
+                self.assertTrue(row.endswith(art), row)
+                self.assertEqual(sl.width(row) - sl.width(art), start, row)
+                self.assertNotIn("  ", row)   # Claude Code collapses plain spaces
 
     def test_text_keeps_clear_of_mascot(self):
         rows = self.rows(70)
-        for row, art in zip(rows, sl.MASCOT):
+        for row, art in zip(rows, self.art(sl.mascot_mood(SAMPLE))):
             text = row[:-len(art)].rstrip(sl.NBSP)
             self.assertLessEqual(sl.width(text) + sl.MASCOT_GAP, 70 - sl.MASCOT_W, row)
+
+    def test_mood_rules(self):
+        def d(h5=None, d7=None, ctx=None, added=None, removed=None, cost=None):
+            out = {"rate_limits": {}, "context_window": {}, "cost": {}}
+            if h5 is not None:
+                out["rate_limits"]["five_hour"] = {"used_percentage": h5}
+            if d7 is not None:
+                out["rate_limits"]["seven_day"] = {"used_percentage": d7}
+            if ctx is not None:
+                out["context_window"]["used_percentage"] = ctx
+            for k, v in (("total_lines_added", added), ("total_lines_removed", removed),
+                         ("total_cost_usd", cost)):
+                if v is not None:
+                    out["cost"][k] = v
+            return out
+        cases = [
+            ({}, "normal"),
+            (d(h5=79.9, d7=79.9, ctx=79.9, added=200, removed=99, cost=19.99), "normal"),
+            (d(h5=80), "tense"),
+            (d(d7=95.5), "tense"),
+            (d(ctx=80), "sweat"),
+            (d(added=300), "proud"),
+            (d(added=150, removed=150), "proud"),
+            (d(cost=20), "proud"),
+            # priority: usage > context > proud
+            (d(h5=90, ctx=95, added=999, cost=99), "tense"),
+            (d(ctx=95, added=999, cost=99), "sweat"),
+        ]
+        for data, want in cases:
+            self.assertEqual(sl.mascot_mood(data), want, data)
+
+    def test_mood_with_missing_or_odd_fields(self):
+        odd = [
+            {"rate_limits": None, "context_window": None, "cost": None},
+            {"rate_limits": {"five_hour": None, "seven_day": {}}},
+            {"rate_limits": {"five_hour": {"used_percentage": "abc"}}},
+            {"rate_limits": {"five_hour": {"used_percentage": True}}},
+            {"context_window": {"used_percentage": None}},
+            {"context_window": {"used_percentage": float("nan")}},
+            {"cost": {"total_lines_added": "lots", "total_cost_usd": [1]}},
+            {"rate_limits": [], "context_window": "x", "cost": 5},
+        ]
+        for data in odd:
+            self.assertEqual(sl.mascot_mood(data), "normal", data)
+        self.assertEqual(sl.mascot_mood({"context_window": {"used_percentage": "85"}}), "sweat")
+
+    def test_every_face_same_place_and_width(self):
+        # Switching faces between redraws must not shift anything.
+        datas = {
+            "normal": CALM,
+            "tense": dict(CALM, rate_limits={"five_hour": {"used_percentage": 88}}),
+            "sweat": dict(CALM, context_window={"used_percentage": 91}),
+            "proud": dict(CALM, cost={"total_lines_added": 400}),
+        }
+        self.assertEqual(set(datas), set(sl.MASCOT_FACES))
+        shapes = {}
+        for mood, data in datas.items():
+            self.assertEqual(sl.mascot_mood(data), mood)
+            rows = self.rows(100, data=data)
+            for row, art in zip(rows, self.art(mood)):
+                self.assertTrue(row.endswith(art), (mood, row))
+            shapes[mood] = [(sl.width(r), sl.width(r) - sl.MASCOT_W) for r in rows]
+            for a, m, _ in sl.mascot_rows(mood):
+                self.assertLessEqual(sl.width(a + m), sl.MASCOT_W)
+            self.assertEqual(sl.width(rows[0]), 100, mood)
+        self.assertEqual(len(set(map(tuple, shapes.values()))), 1, shapes)
+
+    def test_face_marks(self):
+        self.assertIn("!", self.rows(120, data=SAMPLE)[0])          # SAMPLE: 7-day 81 %
+        self.assertTrue(self.rows(120, data=CALM)[0].endswith("█" + sl.NBSP))
+        out = sl.render(dict(CALM, context_window={"used_percentage": 90}), 120, NOW,
+                        codex=False, mascot=True)
+        self.assertIn(sl.C_SWEAT + "▖", out)
 
     def test_narrow_terminal_drops_mascot(self):
         rows = self.rows(sl.MASCOT_MIN_COLS - 1)
@@ -211,6 +289,7 @@ class Mascot(Env):
         self.assertEqual(r.returncode, 0)
         out = plain(r.stdout.decode("utf-8"))
         self.assertIn(sl.MASCOT[1], out)
+        self.assertIn("!", out.splitlines()[0])    # SAMPLE: 7-day usage 81 % -> tense
 
 
 class Codex(Env):

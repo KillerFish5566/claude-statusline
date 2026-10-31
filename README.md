@@ -69,7 +69,7 @@ The `.claude.json` usage cache and the Codex session log format are internal and
 |---|---|
 | `--lang en\|zh-TW` | Label language (default `en`) |
 | `--no-codex` | Never show Codex rows |
-| `--mascot` | Draw Clawd, the pixel character from Claude Code's start-up screen, 3 rows tall at the right end. Adds a third row when there are only two. Hidden when the terminal is narrower than 64 columns |
+| `--mascot` | Draw Clawd, the pixel character from Claude Code's start-up screen, 3 rows tall at the right end. Adds a third row when there are only two. Hidden when the terminal is narrower than 64 columns. Its face follows the session: tense when the 5-hour or 7-day usage reaches 80 %, sweating when the context window reaches 80 %, proud after 300 changed lines or $20 of session cost, normal otherwise (or when the data is missing). The face changes only when Claude Code redraws the status line; there is no timer animation |
 | `CLAUDE_CONFIG_DIR` | Read `.claude.json` from this folder instead of your home folder (same variable Claude Code uses) |
 | `CODEX_HOME` | Read Codex sessions from `$CODEX_HOME/sessions` instead of `~/.codex/sessions` |
 
