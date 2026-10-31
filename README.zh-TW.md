@@ -5,7 +5,7 @@
 [English](README.md)
 
 ```
-Opus 5.5 · high · Max 5x │ my-project (main*) │ 記憶 ▰▰▰▱▱▱▱▱▱▱ 34%
+Opus 5.5 · high · Max │ my-project (main*) │ 記憶 ▰▰▰▱▱▱▱▱▱▱ 34%
 5小時 23% 23:00重置 │ 7天 81% 週二 10:46重置 │ Fable 週 0% (5小時前) │ $1.23 · 42分 │ +120 -30
 ◐ Codex · my-project · 審查中 2分 · 指令 3 次
 ✓ Codex · other-repo · 審查完成 用時 5分 · 指令 1 次
@@ -16,7 +16,7 @@ Opus 5.5 · high · Max 5x │ my-project (main*) │ 記憶 ▰▰▰▱▱▱�
 | 段落 | 來源 | 說明 |
 |---|---|---|
 | 模型・推理檔位 | Claude Code 傳入的資料 | 開快速模式時多一個 `fast` |
-| 方案（`Max 5x`、`Pro`…） | Claude Code 的 `.claude.json` | 傳入的資料沒有這項 |
+| 方案（`Pro`、`Max`、`Ultra`…） | Claude Code 的 `.claude.json` | 傳入的資料沒有這項；用官方新名稱：2026-10-30 起 Max 5x 改叫 **Max**、Max 20x 改叫 **Ultra** |
 | 資料夾（分支） | 目前資料夾＋`git status` | `*` 表示有還沒提交的修改 |
 | 記憶 | 對話記憶用量 | 未滿 50% 綠、未滿 80% 黃、80% 以上紅 |
 | 5小時／7天 | 用量上限 | 只有 Pro／Max 訂閱才有，第一次回覆後才出現 |
@@ -50,9 +50,12 @@ Opus 5.5 · high · Max 5x │ my-project (main*) │ 記憶 ▰▰▰▱▱▱�
 - Windows 路徑請用正斜線 `/`。
 - 如果打 `python` 會跳出 Microsoft Store，就改填 `python.exe` 的完整路徑。
 - `refreshInterval` 讓 Claude 在背景等 Codex 時，畫面也會繼續更新。
+- 想在狀態列右邊放 Claude Code 啟動畫面那隻像素小怪（Clawd，3 行高），在指令最後加 `--mascot`。只有兩行字時會多出第三行；終端機寬度不到 64 字元時自動不畫。
 
-其他選項（`--no-codex`、`CLAUDE_CONFIG_DIR`、`CODEX_HOME`）與隱私說明，見[英文版](README.md)。
+其他選項（`--no-codex`、`--mascot`、`CLAUDE_CONFIG_DIR`、`CODEX_HOME`）與隱私說明，見[英文版](README.md)。
 
 ## 授權
 
 [MIT](LICENSE)
+
+Claude、Claude Code 與 Clawd 屬於 Anthropic；本專案與 Anthropic 無關，也未經其背書。

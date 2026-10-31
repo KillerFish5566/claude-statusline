@@ -5,7 +5,7 @@ A status line for [Claude Code](https://code.claude.com/docs/en/statusline) that
 [繁體中文說明](README.zh-TW.md)
 
 ```
-Opus 5.5 · high · Max 5x │ my-project (main*) │ ctx ▰▰▰▱▱▱▱▱▱▱ 34%
+Opus 5.5 · high · Max │ my-project (main*) │ ctx ▰▰▰▱▱▱▱▱▱▱ 34%
 5h 23% resets 23:00 │ 7d 81% resets Tue 10:46 │ Fable wk 0% (5h ago) │ $1.23 · 42m │ +120 -30
 ◐ Codex · my-project · review running 2m · 3 cmds
 ✓ Codex · other-repo · review done in 5m · 1 cmds
@@ -21,7 +21,7 @@ Opus 5.5 · high · Max 5x │ my-project (main*) │ ctx ▰▰▰▱▱▱▱�
 | Segment | Source | Notes |
 |---|---|---|
 | Model · effort | stdin `model.id`, `effort.level` | `fast` appears when fast mode is on |
-| Plan tier (`Max 5x`, `Pro`, …) | `oauthAccount` in Claude Code's `.claude.json` | Not provided on stdin |
+| Plan (`Pro`, `Max`, `Ultra`, …) | `oauthAccount` in Claude Code's `.claude.json` | Not provided on stdin. Uses the current plan names: on 2026-10-30 Anthropic renamed Max 5x to **Max** and Max 20x to **Ultra** |
 | Folder (branch) | stdin `workspace.current_dir` + `git status` | `*` = uncommitted changes |
 | `ctx` bar | stdin `context_window.used_percentage` | Green below 50 %, yellow below 80 %, red at 80 % and above |
 | `5h` / `7d` | stdin `rate_limits` | Only for Pro/Max subscribers, after the first reply |
@@ -69,6 +69,7 @@ The `.claude.json` usage cache and the Codex session log format are internal and
 |---|---|
 | `--lang en\|zh-TW` | Label language (default `en`) |
 | `--no-codex` | Never show Codex rows |
+| `--mascot` | Draw Clawd, the pixel character from Claude Code's start-up screen, 3 rows tall at the right end. Adds a third row when there are only two. Hidden when the terminal is narrower than 64 columns |
 | `CLAUDE_CONFIG_DIR` | Read `.claude.json` from this folder instead of your home folder (same variable Claude Code uses) |
 | `CODEX_HOME` | Read Codex sessions from `$CODEX_HOME/sessions` instead of `~/.codex/sessions` |
 
@@ -79,7 +80,7 @@ A Codex job counts as a **review** when its prompt contains `$independent-review
 The script only reads files:
 
 - the JSON Claude Code sends it
-- `.claude.json`: just `oauthAccount.organizationType`, `organizationRateLimitTier`, `accountUuid`, and `cachedUsageUtilization`
+- `.claude.json`: just `oauthAccount.planDisplayName`, `organizationType`, `organizationRateLimitTier`, `accountUuid`, and `cachedUsageUtilization`
 - Codex session logs from the last day: only the working folder, event types, and timestamps
 
 It never reads credential files, writes nothing, and makes no network calls. Your email address and account IDs are never printed.
@@ -95,3 +96,5 @@ The tests build fake `.claude.json` and Codex logs in a temporary folder. They n
 ## License
 
 [MIT](LICENSE)
+
+Claude, Claude Code and Clawd belong to Anthropic. This project is not affiliated with or endorsed by Anthropic.

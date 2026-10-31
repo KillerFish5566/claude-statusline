@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Plan names follow Anthropic's 2026-10-30 rename: Max 5x shows as **Max**, Max 20x as **Ultra**. Reads `planDisplayName` from `.claude.json` when Claude Code provides it.
+- `--mascot`: Clawd, 3 rows tall, at the right end of the status line (off by default).
+
 ## 0.1.0 — 2026-09-26
 
 First release.
