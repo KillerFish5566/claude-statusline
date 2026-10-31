@@ -79,6 +79,16 @@ CODEX_STALE_HIDE_S = 60 * 60    # hide stale jobs after 1 h
 CODEX_MAX_ROWS = 3
 USAGE_CACHE_AGE_SHOW_S = 10 * 60   # show "(3h ago)" once the cache is older than this
 
+# Optional mascot (--mascot): Clawd, the pixel character from Claude Code's
+# start-up screen (same glyphs and colour as Claude Code 2.1.316 draws),
+# 3 rows tall at the right end of the status line.
+C_CLAWD = rgb(215, 119, 87)
+MASCOT = (" ▐▛███▛█", "▝▜██████▀", " ▝▝   ▝▝")
+MASCOT_W = 9           # columns taken by the widest row
+MASCOT_GAP = 2         # minimum space between the text and the mascot
+MASCOT_MIN_COLS = 60   # narrower than this: no mascot, the text needs the room
+NBSP = " "        # Claude Code collapses runs of normal spaces
+
 
 # ── Helpers ─────────────────────────────────────────────
 def get(d, *keys):
@@ -165,15 +175,27 @@ def load_claude_json():
         return {}
 
 
+# On 2026-10-30 Anthropic renamed "Max 5x" to "Max" and "Max 20x" to "Ultra"
+# (same prices). The account codes in .claude.json did not change
+# (still claude_max + default_claude_max_5x / _20x), so map them here.
+PLAN_RENAMES = {"max 5x": "Max", "max 20x": "Ultra"}
+
+
 def plan_tier(cfg):
     acct = cfg.get("oauthAccount") or {}
+    # Newer Claude Code versions store the plan's display name directly.
+    shown = acct.get("planDisplayName")
+    if isinstance(shown, str) and shown.strip():
+        shown = re.sub(r"^claude\s+", "", shown.strip(), flags=re.I)
+        return PLAN_RENAMES.get(shown.lower(), shown)
     org = acct.get("organizationType") or ""
     tier = acct.get("organizationRateLimitTier") or acct.get("userRateLimitTier") or ""
     if not org:
         return ""
     name = org.replace("claude_", "").replace("_", " ").title()
     mult = re.search(r"(\d+x)$", tier)
-    return f"{name} {mult.group(1)}" if mult else name
+    full = f"{name} {mult.group(1)}" if mult else name
+    return PLAN_RENAMES.get(full.lower(), full)
 
 
 def scoped_weekly_limits(cfg, now):
@@ -400,7 +422,27 @@ def codex_line(r, now):
 
 
 # ── Main ────────────────────────────────────────────────
-def render(data, cols, now, codex=True):
+def add_mascot(lines, cols):
+    """Put the 3-row mascot at the right end of the first three rows.
+
+    Pads with NBSP because Claude Code collapses runs of normal spaces.
+    Returns the lines unchanged if any of the first three rows is too wide.
+    """
+    start = cols - MASCOT_W
+    rows = list(lines) + [""] * max(0, len(MASCOT) - len(lines))
+    if any(width(rows[i]) + MASCOT_GAP > start for i in range(len(MASCOT))):
+        return list(lines)
+    for i, art in enumerate(MASCOT):
+        pad = NBSP * (start - width(rows[i]))
+        rows[i] = f"{rows[i]}{RESET}{pad}{C_CLAWD}{art.replace(' ', NBSP)}{RESET}"
+    return rows
+
+
+def render(data, cols, now, codex=True, mascot=False):
+    full_cols = cols
+    mascot = mascot and cols >= MASCOT_MIN_COLS
+    if mascot:
+        cols -= MASCOT_W + MASCOT_GAP
     cfg = load_claude_json()
     lines = [fit([
         (seg_model(data, plan_tier(cfg)), 0),
@@ -423,7 +465,10 @@ def render(data, cols, now, codex=True):
             lines += [codex_line(r, now) for r in codex_runs(now)]
         except Exception:
             pass
-    return "\n".join(ln for ln in lines if ln)
+    lines = [ln for ln in lines if ln]
+    if mascot:
+        lines = add_mascot(lines, full_cols)
+    return "\n".join(lines)
 
 
 def main(argv=None):
@@ -431,6 +476,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Claude Code status line")
     ap.add_argument("--lang", choices=sorted(STRINGS), default="en")
     ap.add_argument("--no-codex", action="store_true", help="hide Codex rows")
+    ap.add_argument("--mascot", action="store_true",
+                    help="draw Clawd (3 rows tall) at the right end")
     args = ap.parse_args(argv)
     T = STRINGS[args.lang]
     try:
@@ -446,7 +493,8 @@ def main(argv=None):
             cols = int(os.environ.get("COLUMNS") or 0) or 120
         except ValueError:
             cols = 120
-        print(render(data, max(cols - 4, 30), time.time(), codex=not args.no_codex))
+        print(render(data, max(cols - 4, 30), time.time(),
+                     codex=not args.no_codex, mascot=args.mascot))
     except Exception:
         # Last line of defence: a non-zero exit or empty output blanks the status line.
         print(T["error"])

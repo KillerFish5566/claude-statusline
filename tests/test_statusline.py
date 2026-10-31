@@ -126,9 +126,24 @@ class Formatting(unittest.TestCase):
 
 class ClaudeCache(Env):
     def test_tier(self):
-        self.assertEqual(sl.plan_tier(claude_cfg()), "Max 5x")
+        # 2026-10-30 rename: Max 5x -> Max, Max 20x -> Ultra (account codes unchanged)
+        self.assertEqual(sl.plan_tier(claude_cfg()), "Max")
+        max20 = {"oauthAccount": {"organizationType": "claude_max",
+                                  "organizationRateLimitTier": "default_claude_max_20x"}}
+        self.assertEqual(sl.plan_tier(max20), "Ultra")
         self.assertEqual(sl.plan_tier({"oauthAccount": {"organizationType": "claude_pro"}}), "Pro")
+        self.assertEqual(sl.plan_tier({"oauthAccount": {"organizationType": "claude_ultra"}}), "Ultra")
         self.assertEqual(sl.plan_tier({}), "")
+
+    def test_tier_prefers_plan_display_name(self):
+        def acct(**kw):
+            return {"oauthAccount": dict({"organizationType": "claude_max",
+                                          "organizationRateLimitTier": "default_claude_max_20x"}, **kw)}
+        self.assertEqual(sl.plan_tier(acct(planDisplayName="Ultra")), "Ultra")
+        self.assertEqual(sl.plan_tier(acct(planDisplayName="Claude Ultra")), "Ultra")
+        self.assertEqual(sl.plan_tier(acct(planDisplayName="Max 20x")), "Ultra")
+        self.assertEqual(sl.plan_tier(acct(planDisplayName="")), "Ultra")
+        self.assertEqual(sl.plan_tier(acct(planDisplayName=None)), "Ultra")
 
     def test_scoped_limit_with_age(self):
         lims = sl.scoped_weekly_limits(claude_cfg(), NOW)
@@ -149,8 +164,53 @@ class ClaudeCache(Env):
         self.write_cfg(claude_cfg())
         out = plain(sl.render(SAMPLE, 200, NOW, codex=False))
         self.assertNotIn("example.com", out)
-        self.assertIn("Max 5x", out)
+        self.assertIn("· Max │", out)
         self.assertIn("Fable wk 42%", out)
+
+
+class Mascot(Env):
+    def rows(self, cols, mascot=True, data=SAMPLE):
+        return plain(sl.render(data, cols, NOW, codex=False, mascot=mascot)).split("\n")
+
+    def test_off_by_default(self):
+        out = plain(sl.render(SAMPLE, 120, NOW, codex=False))
+        self.assertNotIn("▛", out)
+        self.assertNotIn(sl.NBSP, out)
+
+    def test_three_rows_right_aligned(self):
+        rows = self.rows(120)
+        self.assertEqual(len(rows), 3)
+        start = 120 - sl.MASCOT_W
+        for row, art in zip(rows, sl.MASCOT):
+            art = art.replace(" ", sl.NBSP)
+            self.assertTrue(row.endswith(art), row)
+            self.assertEqual(sl.width(row) - sl.width(art), start, row)
+            self.assertNotIn("  ", row)   # Claude Code collapses plain spaces
+
+    def test_text_keeps_clear_of_mascot(self):
+        rows = self.rows(70)
+        for row, art in zip(rows, sl.MASCOT):
+            text = row[:-len(art)].rstrip(sl.NBSP)
+            self.assertLessEqual(sl.width(text) + sl.MASCOT_GAP, 70 - sl.MASCOT_W, row)
+
+    def test_narrow_terminal_drops_mascot(self):
+        rows = self.rows(sl.MASCOT_MIN_COLS - 1)
+        self.assertNotIn("▛", "\n".join(rows))
+        self.assertEqual(rows, self.rows(sl.MASCOT_MIN_COLS - 1, mascot=False))
+
+    def test_first_row_only(self):
+        rows = self.rows(120, data={"model": {"id": "claude-opus-5-5"}})
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(rows[2].startswith(sl.NBSP))
+
+    def test_cli_flag(self):
+        env = dict(os.environ, COLUMNS="120", PYTHONIOENCODING="utf-8")
+        r = subprocess.run([sys.executable, str(ROOT / "statusline.py"), "--mascot"],
+                           input=json.dumps(SAMPLE).encode("utf-8"), capture_output=True,
+                           env=env, timeout=20)
+        self.assertEqual(r.returncode, 0)
+        out = plain(r.stdout.decode("utf-8"))
+        self.assertIn(sl.MASCOT[1], out)
 
 
 class Codex(Env):
@@ -187,7 +247,7 @@ class EndToEnd(Env):
         code, out = self.run_script(json.dumps(SAMPLE), "--lang", "zh-TW", cols="200")
         self.assertEqual(code, 0)
         l1, l2 = out.splitlines()[:2]
-        self.assertTrue(l1.startswith("Opus 5.5 · high · Max 5x │ claude-statusline"))
+        self.assertTrue(l1.startswith("Opus 5.5 · high · Max │ claude-statusline"))
         self.assertIn("記憶 ▰▰▰▱▱▱▱▱▱▱ 34%", l1)
         self.assertIn("5小時 23%", l2)
         self.assertIn("Fable 週 42% (3小時前)", l2)
